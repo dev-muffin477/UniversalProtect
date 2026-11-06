@@ -1,0 +1,25 @@
+name: UniversalProtect
+version: '1.3.0'
+main: de.muffin.universalprotect.UniversalProtect
+api-version: '26.3'
+description: 'Advanced Block, Chat and Action Logger with CoreProtect-like Syntax'
+authors: ['__Muffin____']
+commands:
+  up:
+    description: UniversalProtect Main Command
+    usage: /up <help|i|l|rb|rs|purge|undo|status|near|reload|consumer|migrate-db>
+    aliases: [universalprotect]
+permissions:
+  universalprotect.*: { default: op }
+  universalprotect.inspect: { default: op }
+  universalprotect.lookup: { default: op }
+  universalprotect.rollback: { default: op }
+  universalprotect.restore: { default: op }
+  universalprotect.teleport: { default: op }
+  universalprotect.help: { default: op }
+  universalprotect.purge: { default: op }
+  universalprotect.reload: { default: op }
+  universalprotect.status: { default: op }
+  universalprotect.consumer: { default: op }
+  universalprotect.give: { default: false }
+  universalprotect.networking: { default: op }
