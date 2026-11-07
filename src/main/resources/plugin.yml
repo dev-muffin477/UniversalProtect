@@ -1,0 +1,34 @@
+name: UniversalProtect
+main: de.muffin.universalprotect.UniversalProtect
+version: ${project.version}
+api-version: '26.3'
+authors: [Muffin]
+description: Block, container, entity and chat logging with rollback/restore - a full CoreProtect replacement.
+website: https://example.invalid/universalprotect
+
+# Datenbank-Treiber werden beim ersten Start von Paper automatisch geladen (SQLite ist in Paper enthalten).
+libraries:
+  - org.duckdb:duckdb_jdbc:1.1.3
+  - com.clickhouse:clickhouse-jdbc:0.6.5
+  - org.lz4:lz4-java:1.8.0
+  - com.mysql:mysql-connector-j:8.4.0
+
+commands:
+  up:
+    description: UniversalProtect - lookup, rollback, restore, purge, migrate-db
+    usage: /up help
+    aliases: [universalprotect, uprotect]
+    permission: universalprotect.use
+
+permissions:
+  universalprotect.use:
+    description: Lookup, inspector and status
+    default: op
+  universalprotect.admin:
+    description: Rollback, restore, purge, reload, alerts, migrate-db
+    default: op
+    children:
+      universalprotect.use: true
+  universalprotect.networking:
+    description: Allows client mods (Watson, ShadowTrace) to receive results
+    default: op
