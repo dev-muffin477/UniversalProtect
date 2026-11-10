@@ -4,6 +4,19 @@
 
 > **Status:** The Fabric edition is a new port of the Paper plugin. Please report bugs in the issue tracker.
 
+
+
+
+## Comparison
+
+| Feature / Comparison | UniversalProtect | CoreProtect |
+| :--- | :---: | :---: |
+| **Multi-Platform (Paper & Fabric)** | ✔ Yes (Native) | ✖ No (Spigot/Paper only) |
+| **New MC Version Updates** | ✔ Immediate / Fast Port | ✖ Delayed / Extended Waits |
+| **Modern Databases (DuckDB, ClickHouse)** | ✔ Supported | ✖ Not supported |
+| **Live DB Migration (`/up migrate-db`)** | ✔ Yes (No restart needed) | ✖ No |
+| **Client Mod API (e.g., Watson)** | ✔ Yes (Integrated) | ✖ No / Limited |
+
 ## Features
 
 * **Asynchronous execution:** Database work runs on a dedicated thread to preserve server TPS.
