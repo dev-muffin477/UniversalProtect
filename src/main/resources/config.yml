@@ -105,3 +105,6 @@ detection:
 
 retention:
   aggregate-after-days: 0
+
+metrics:
+  enabled: true
