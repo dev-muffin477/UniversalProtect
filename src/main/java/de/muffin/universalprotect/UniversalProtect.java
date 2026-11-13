@@ -2,6 +2,7 @@ package de.muffin.universalprotect;
 
 import de.muffin.universalprotect.api.UniversalProtectAPI;
 import org.bstats.bukkit.Metrics;
+import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
@@ -112,7 +113,9 @@ public final class UniversalProtect extends JavaPlugin {
         }
         Bukkit.getScheduler().runTaskLaterAsynchronously(this, () -> rollback.resumePending(), 200L);
         if (BSTATS_ID > 0 && getConfig().getBoolean("metrics.enabled", true)) {
-            new Metrics(this, BSTATS_ID);
+            Metrics metrics = new Metrics(this, BSTATS_ID);
+            metrics.addCustomChart(new SimplePie("database_type",
+                    () -> getConfig().getString("database.type", "duckdb")));
         }
         getLogger().info("UniversalProtect " + getPluginMeta().getVersion() + " enabled.");
     }
