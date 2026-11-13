@@ -3,3 +3,5 @@ build/
 .gradle/
 run/
 *.log
+src.bak.*/
+*.bak.*
