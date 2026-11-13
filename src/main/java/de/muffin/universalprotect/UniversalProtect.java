@@ -35,8 +35,7 @@ public final class UniversalProtect extends JavaPlugin {
     private NetworkHandler network;
     private UniversalProtectAPI api;
 
-    // TODO: Plugin-ID von https://bstats.org eintragen (0 = Metrics aus)
-    private static final int BSTATS_ID = 0;
+    private static final int BSTATS_ID = 35314;
 
     @Override
     public void onEnable() {
