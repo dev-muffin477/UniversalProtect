@@ -1,0 +1,27 @@
+{
+  "required": false,
+  "package": "de.muffin.universalprotect.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "LevelMixin",
+    "GameModeMixin",
+    "ExplosionMixin",
+    "FireMixin",
+    "LeavesMixin",
+    "LivingEntityMixin",
+    "FallingBlockMixin",
+    "ServerLevelMixin",
+    "EntityMixin",
+    "PlayerMixin",
+    "ItemEntityMixin",
+    "ResultSlotMixin",
+    "ServerPlayerMixin",
+    "CommandsMixin",
+    "SignMixin",
+    "CreativeMixin",
+    "TradeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

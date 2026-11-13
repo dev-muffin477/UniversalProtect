@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "universalprotect",
+  "version": "${version}",
+  "name": "UniversalProtect",
+  "description": "Block, container, entity and chat logging with rollback/restore - a full CoreProtect replacement for Fabric servers.",
+  "authors": ["Muffin"],
+  "contact": { "homepage": "https://modrinth.com/plugin/universalprotect" },
+  "license": "All-Rights-Reserved",
+  "environment": "server",
+  "entrypoints": {
+    "main": ["de.muffin.universalprotect.UniversalProtect"]
+  },
+  "mixins": ["universalprotect.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.20.0",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
