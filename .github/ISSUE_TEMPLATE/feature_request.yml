@@ -1,0 +1,17 @@
+name: Feature request
+description: Suggest an idea
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition
+      options: [Both, Paper, Fabric]
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to have, and why?
+    validations:
+      required: true

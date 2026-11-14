@@ -1,0 +1,23 @@
+# Build output
+dist/
+target/
+build/
+.gradle/
+run/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and backups
+*.log
+src.bak.*/
+*.bak.*
