@@ -19,7 +19,7 @@ public final class CommandHandler {
     private static final List<String> TAGS_ROLLBACK = List.of("#preview", "#verbose", "#silent", "#command");
     private static final List<String> TAGS_PURGE = List.of("#optimize", "#silent");
     private static final List<String> USER_SUBS = List.of("help", "inspect", "lookup", "near", "page", "stats", "status");
-    private static final List<String> ADMIN_SUBS = List.of("rollback", "restore", "apply", "cancel", "undo", "purge",
+    private static final List<String> ADMIN_SUBS = List.of("rollback", "restore", "apply", "cancel", "undo", "purge", "clear",
             "alerts", "reload", "consumer", "migrate-db", "import-coreprotect", "compact", "investigate", "timeline", "audit");
 
     private static volatile List<String> MATERIALS;
@@ -206,6 +206,10 @@ public final class CommandHandler {
                 if (!requireAdmin(sender)) return;
                 purge(sender, args);
             }
+            case "clear" -> {
+                if (!requireAdmin(sender)) return;
+                clear(sender, args);
+            }
             case "compact" -> {
                 if (!requireAdmin(sender)) return;
                 Map<String, String> p = ParamUtils.parseArgs(args);
@@ -289,6 +293,28 @@ public final class CommandHandler {
         plugin.db().purge(sender, q, optimize, silent);
     }
 
+    private void clear(Sender sender, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("confirm")) { plugin.db().clearConfirm(sender); return; }
+        if (args.length >= 2 && args[1].equalsIgnoreCase("cancel")) { plugin.db().clearCancel(sender); return; }
+        String cat = args.length >= 2 ? LogStorage.normalize(args[1]) : null;
+        if (cat == null) {
+            Msg.err(sender, "Usage: /up clear <" + String.join("|", LogStorage.names()) + "> [t:<time>]  —  then /up clear confirm");
+            return;
+        }
+        long until = 0;
+        for (int i = 2; i < args.length; i++) {
+            if (args[i].toLowerCase(Locale.ROOT).startsWith("t:")) {
+                long time = ParamUtils.parseTime(args[i].substring(2));
+                if (time < 86_400_000L) { Msg.err(sender, "Invalid time. Use t:1d or more, e.g. t:30d."); return; }
+                until = System.currentTimeMillis() - time;
+            } else {
+                Msg.err(sender, "Unknown argument: " + Msg.esc(args[i]));
+                return;
+            }
+        }
+        plugin.db().clearRequest(sender, cat, until);
+    }
+
     private void sendHelp(Sender p) {
         List<String> L = new ArrayList<>();
         L.add(helpLine("/up inspect (i)", "Toggle the inspector"));
@@ -296,13 +322,14 @@ public final class CommandHandler {
         L.add(helpLine("/up lookup 2:10", "Page 2 with 10 lines per page"));
         L.add(helpLine("/up near", "Lookup within radius 5"));
         L.add(helpLine("/up page [n[:lines]]", "Other page of the last lookup"));
-        L.add(helpLine("/up stats | status", "Database statistics / status"));
+        L.add(helpLine("/up stats | status", "Database statistics, size per log type / status"));
         if (p.hasPermission(PERM_ADMIN)) {
             L.add(helpLine("/up rollback (rb) <params>", "Roll back (needs t:), #preview first, #command = /fill etc."));
             L.add(helpLine("/up restore (rs) <params>", "Re-apply rolled back changes"));
             L.add(helpLine("/up apply | cancel", "Confirm or discard a #preview"));
             L.add(helpLine("/up undo", "Revert the last rollback/restore"));
             L.add(helpLine("/up purge t:30d [#optimize]", "Delete old data (r:, i:, a:kill e: possible)"));
+            L.add(helpLine("/up clear <category> [t:<time>]", "Delete one log type to save space, e.g. /up clear blocks t:30d (asks to confirm)"));
             L.add(helpLine("/up migrate-db <type> [--full-validation]", "Console: migrate to sqlite/mysql/duckdb/clickhouse"));
             L.add(helpLine("/up import-coreprotect sqlite|mysql ...", "Console: import a CoreProtect database"));
             L.add(helpLine("/up compact t:30d [#dry]", "Summarise old block rows per player/chunk/day (a:agg)"));
@@ -326,7 +353,7 @@ public final class CommandHandler {
         };
     }
 
-    private static final Set<String> AUDITED = Set.of("rollback", "restore", "apply", "undo", "purge", "compact", "import-coreprotect", "migrate-db", "reload", "consumer");
+    private static final Set<String> AUDITED = Set.of("rollback", "restore", "apply", "undo", "purge", "clear", "compact", "import-coreprotect", "migrate-db", "reload", "consumer");
 
     private static Investigator.Out outOf(Sender s) {
         return new Investigator.Out() {
@@ -475,6 +502,19 @@ public final class CommandHandler {
             case "compact" -> {
                 if (!sender.hasPermission(PERM_ADMIN)) return List.of();
                 keys = List.of("t:"); tags = List.of("#dry");
+            }
+            case "clear" -> {
+                if (!sender.hasPermission(PERM_ADMIN)) return List.of();
+                if (args.length == 2) {
+                    List<String> o = new ArrayList<>(LogStorage.names());
+                    o.add("confirm");
+                    o.add("cancel");
+                    String pre = args[1].toLowerCase(Locale.ROOT);
+                    o.removeIf(x -> !x.startsWith(pre));
+                    return o;
+                }
+                if (args.length == 3) return "t:".startsWith(args[2].toLowerCase(Locale.ROOT)) ? List.of("t:") : List.of();
+                return List.of();
             }
             case "purge" -> {
                 if (!sender.hasPermission(PERM_ADMIN)) return List.of();

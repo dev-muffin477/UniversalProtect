@@ -438,12 +438,15 @@ public final class Hooks {
     }
 
     public void creative(ServerPlayer p, ItemStack cursor) {
-        if (cursor == null || cursor.isEmpty() || !on("log.items", p.level())) return;
+        if (cursor == null || cursor.isEmpty() || !on("log.creative", p.level())) return;
+        int have = 0;
         for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
-            ItemStack have = p.getInventory().getItem(i);
-            if (!have.isEmpty() && ItemStack.isSameItemSameComponents(have, cursor)) return;
+            ItemStack s = p.getInventory().getItem(i);
+            if (!s.isEmpty() && ItemStack.isSameItemSameComponents(s, cursor)) have += s.getCount();
         }
-        logItem("item", Actor.of(p), Actions.CREATE, cursor, cursor.getCount(), p.level(), p.blockPosition(), null);
+        int gained = cursor.getCount() - have;
+        if (gained <= 0) return;
+        logItem("item", Actor.of(p), Actions.CREATE, cursor, gained, p.level(), p.blockPosition(), "creative");
     }
 
     public void trade(ServerPlayer p, ItemStack result, ItemStack costA, ItemStack costB) {

@@ -8,7 +8,7 @@ public final class Settings {
     public static final List<String> OPTION_KEYS = List.of(
             "log.block", "log.block-changes", "log.container", "log.items", "log.pickup", "log.interact",
             "log.signs", "log.frames", "log.chat", "log.commands", "log.kills", "log.deaths", "log.sessions",
-            "log.inventory", "log.spawns", "log.usernames", "log.trades", "log.ender", "log.command-blocks");
+            "log.inventory", "log.spawns", "log.usernames", "log.trades", "log.ender", "log.command-blocks", "log.creative");
 
     private volatile Map<String, Boolean> global = Map.of();
     private volatile Map<String, Map<String, Boolean>> perWorld = Map.of();
@@ -32,7 +32,7 @@ public final class Settings {
         c.addDefault("discord.alerts-webhook", "");
         c.addDefault("discord.audit-webhook", "");
         c.addDefault("discord.min-level", 2);
-        c.addDefault("discord.audit-events", new ArrayList<>(java.util.List.of("rollback", "restore", "undo", "purge", "migrate-db", "import-coreprotect", "compact")));
+        c.addDefault("discord.audit-events", new ArrayList<>(java.util.List.of("rollback", "restore", "undo", "purge", "migrate-db", "import-coreprotect", "compact", "clear")));
         c.addDefault("discord.startup-errors", true);
         c.addDefault("discord.server-name", "");
         c.addDefault("auto-purge-days", 0);
