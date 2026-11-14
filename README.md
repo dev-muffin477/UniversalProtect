@@ -95,7 +95,7 @@ UniversalProtect/
 │   ├── build.gradle
 │   └── src/
 ├── scripts/          Helper scripts (build-all.sh)
-├── .github/          CI workflow and issue templates
+├── .github/          Issue templates
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 └── LICENSE
