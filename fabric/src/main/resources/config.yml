@@ -1,0 +1,118 @@
+database:
+  type: duckdb
+  sqlite:
+    file: database.db
+  duckdb:
+    file: database.duckdb
+  mysql:
+    host: localhost
+    port: 3306
+    database: universalprotect
+    username: root
+    password: ''
+    parameters: useSSL=false&allowPublicKeyRetrieval=true
+  clickhouse:
+    host: localhost
+    port: 8123
+    database: universalprotect
+    username: default
+    password: ''
+    ssl: false
+
+log:
+  block: true
+  block-changes: true
+  container: true
+  items: true
+  pickup: false
+  interact: true
+  signs: true
+  frames: true
+  chat: true
+  commands: true
+  kills: true
+  deaths: true
+  sessions: true
+  inventory: true
+  spawns: true
+  usernames: true
+  trades: true
+  ender: true
+  command-blocks: true
+  creative: true       # items taken from the creative inventory
+
+alerts:
+  watch-blocks: []
+  cooldown-seconds: 10
+
+auto-purge-days: 0
+
+lookup:
+  default-lines: 15
+  max-lines: 100
+
+chat:
+  width-px: 300
+
+preview:
+  max-blocks: 20000
+  timeout-seconds: 120
+
+rollback:
+  time-budget-ms: 20
+
+networking:
+  enabled: true
+
+detection:
+  enabled: true
+  cooldown-seconds: 60
+  discord-webhook: ''
+  xray:
+    enabled: true
+    min-veins: 6
+    window-seconds: 1200
+    max-blocks-per-vein: 40
+    vein-radius: 6
+    cooldown-seconds: 600
+    explosive-grace-seconds: 600
+    match: ['diamond_ore', 'emerald_ore', 'ancient_debris']
+    explosive-exempt: ['ancient_debris']
+  spawner-breaking:
+    enabled: true
+    count: 3
+    window-seconds: 600
+    match: ['spawner']
+  tnt-placing:
+    enabled: false
+    count: 40
+    window-seconds: 30
+    match: ['tnt']
+  lava-placing:
+    enabled: false
+    count: 15
+    window-seconds: 30
+    match: ['lava']
+  mass-breaking:
+    enabled: false
+    count: 3000
+    window-seconds: 10
+    match: []
+  container-looting:
+    enabled: false
+    count: 256
+    window-seconds: 60
+    match: ['diamond', 'netherite', 'elytra', 'shulker_box', 'totem', 'enchanted_golden_apple', 'beacon']
+
+retention:
+  aggregate-after-days: 0
+
+discord:
+  enabled: true
+  # Webhook URLs (Discord: channel settings > Integrations > Webhooks). Keep them secret.
+  alerts-webhook: ''   # anomaly alerts; empty = falls back to detection.discord-webhook
+  audit-webhook: ''    # staff actions and startup errors
+  min-level: 2         # alerts: 1 = LOW, 2 = MEDIUM, 3 = HIGH (only this level and above is sent)
+  audit-events: [rollback, restore, undo, purge, migrate-db, import-coreprotect, compact, clear]
+  startup-errors: true # e.g. database not reachable
+  server-name: ''      # shown in the footer of every message
