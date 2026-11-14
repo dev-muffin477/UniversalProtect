@@ -338,7 +338,6 @@ public final class AnomalyDetector {
         if (s != null) {
             try { s.accept(a); } catch (Throwable ignored) { }
         }
-        sendWebhook(a);
     }
 
     private void sendWebhook(Alert a) {

@@ -355,6 +355,7 @@ public final class CommandHandler {
             StringBuilder rest = new StringBuilder();
             for (int i = 1; i < args.length; i++) rest.append(args[i]).append(' ');
             plugin.audit().record(sender.name(), sender.isPlayer() ? sender.key().toString() : null, world, x, y, z, sub, rest.toString());
+            plugin.discord().audit(sender.name(), sub, rest.toString(), world, x, y, z);
         } catch (RuntimeException ignored) {  }
     }
 

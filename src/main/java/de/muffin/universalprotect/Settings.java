@@ -28,6 +28,13 @@ public final class Settings {
         for (String key : OPTION_KEYS) c.addDefault(key, defaultFor(key));
         c.addDefault("alerts.watch-blocks", new ArrayList<String>());
         c.addDefault("alerts.cooldown-seconds", 10);
+        c.addDefault("discord.enabled", true);
+        c.addDefault("discord.alerts-webhook", "");
+        c.addDefault("discord.audit-webhook", "");
+        c.addDefault("discord.min-level", 2);
+        c.addDefault("discord.audit-events", new ArrayList<>(java.util.List.of("rollback", "restore", "undo", "purge", "migrate-db", "import-coreprotect", "compact")));
+        c.addDefault("discord.startup-errors", true);
+        c.addDefault("discord.server-name", "");
         c.addDefault("auto-purge-days", 0);
         c.addDefault("lookup.default-lines", 15);
         c.addDefault("lookup.max-lines", 100);

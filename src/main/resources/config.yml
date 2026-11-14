@@ -105,3 +105,13 @@ detection:
 
 retention:
   aggregate-after-days: 0
+
+discord:
+  enabled: true
+  # Webhook URLs (Discord: channel settings > Integrations > Webhooks). Keep them secret.
+  alerts-webhook: ''   # anomaly alerts; empty = falls back to detection.discord-webhook
+  audit-webhook: ''    # staff actions and startup errors
+  min-level: 2         # alerts: 1 = LOW, 2 = MEDIUM, 3 = HIGH (only this level and above is sent)
+  audit-events: [rollback, restore, undo, purge, migrate-db, import-coreprotect, compact]
+  startup-errors: true # e.g. database not reachable
+  server-name: ''      # shown in the footer of every message

@@ -26,6 +26,7 @@ public final class UniversalProtect implements ModInitializer {
     private static UniversalProtectAPI apiInstance;
 
     private final Logger logger = Logger.getLogger("UniversalProtect");
+    private final DiscordNotifier discord = new DiscordNotifier(logger);
     private final Set<UUID> inspecting = ConcurrentHashMap.newKeySet();
     private final Set<UUID> alerts = ConcurrentHashMap.newKeySet();
     private final Set<UUID> alertMuted = ConcurrentHashMap.newKeySet();
@@ -90,6 +91,7 @@ public final class UniversalProtect implements ModInitializer {
         config = Cfg.load(new File(dataFolder, "config.yml"));
         Settings.registerDefaults(config);
         settings.load(this);
+        discord.reload(discordConf());
     }
 
     private void start() {
@@ -106,6 +108,7 @@ public final class UniversalProtect implements ModInitializer {
             db = new DatabaseManager(this, type);
         } catch (Throwable t) {
             logger.severe("Could not open the " + type.id() + " database: " + t);
+            discord.startupError("Database unavailable", "Could not open the " + type.id() + " database: " + t);
             t.printStackTrace();
             return;
         }
@@ -143,6 +146,7 @@ public final class UniversalProtect implements ModInitializer {
         apiInstance = null;
         Sched.shutdown();
         if (db != null) db.close();
+        discord.shutdown();
     }
 
     private int run(CommandSourceStack src, String line) {
@@ -182,6 +186,7 @@ public final class UniversalProtect implements ModInitializer {
     }
 
     private void onAnomaly(AnomalyDetector.Alert a) {
+        discord.alert(a.player(), a.rule(), a.level(), a.label(), a.summary(), a.world(), a.x(), a.y(), a.z());
         logger.warning("[Anomaly] " + a.player() + " " + a.summary() + " @ " + a.world() + " " + a.x() + " " + a.y() + " " + a.z());
         String w = a.world() == null ? "" : a.world().replace("'", "");
         String text = Msg.PREFIX + "<" + a.color() + ">\u26a0 " + a.label() + "</" + a.color() + "> <green>" + Msg.esc(a.player()) + "</green> <gray>" + Msg.esc(a.summary())
@@ -231,6 +236,19 @@ public final class UniversalProtect implements ModInitializer {
     public Compactor compactor() { return compactor; }
     public RollbackJournal journal() { return journal; }
     public StaffAudit audit() { return audit; }
+    public DiscordNotifier discord() { return discord; }
+
+    private DiscordNotifier.Conf discordConf() {
+        String alerts = config.getString("discord.alerts-webhook", "");
+        if (alerts == null || alerts.isBlank()) alerts = config.getString("detection.discord-webhook", "");
+        String audit = config.getString("discord.audit-webhook", "");
+        java.util.Set<String> ev = new java.util.HashSet<>();
+        for (String s : config.getStringList("discord.audit-events")) ev.add(s.toLowerCase(java.util.Locale.ROOT));
+        return new DiscordNotifier.Conf(config.getBoolean("discord.enabled", true),
+                alerts == null ? "" : alerts.trim(), audit == null ? "" : audit.trim(),
+                Math.max(1, Math.min(3, config.getInt("discord.min-level", 2))), ev,
+                config.getBoolean("discord.startup-errors", true), config.getString("discord.server-name", ""));
+    }
     public Investigator investigator() { return investigator; }
     public AnomalyDetector anomaly() { return anomaly; }
     public Hooks hooks() { return hooks; }
