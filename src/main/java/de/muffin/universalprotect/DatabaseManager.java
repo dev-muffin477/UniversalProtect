@@ -473,6 +473,69 @@ public final class DatabaseManager {
         });
     }
 
+    private record ClearRequest(String category, long until, long expires) {}
+
+    private final Map<UUID, ClearRequest> clearRequests = new ConcurrentHashMap<>();
+
+    /** Step 1 of /up clear: counts the rows and asks the sender to confirm. */
+    public void clearRequest(CommandSender sender, String category, long until) {
+        submit(() -> {
+            if (migrating) { Msg.err(sender, "A database migration is running. Try again afterwards."); return; }
+            try {
+                flush();
+                long rows = 0;
+                try (Statement st = connection.createStatement();
+                     ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM logs WHERE " + LogStorage.whereFor(category, until))) {
+                    if (rs.next()) rows = rs.getLong(1);
+                }
+                if (rows == 0) {
+                    Msg.info(sender, "Nothing to clear in <white>" + LogStorage.label(category) + "</white>.");
+                    return;
+                }
+                clearRequests.put(keyOf(sender), new ClearRequest(category, until, System.currentTimeMillis() + 60_000L));
+                Msg.info(sender, "This will permanently delete <white>" + rows + "</white> rows of <white>" + LogStorage.label(category) + "</white>"
+                        + (until > 0 ? " older than " + Msg.ago(System.currentTimeMillis() - until) : "") + ".");
+                Msg.info(sender, "Type <white>/up clear confirm</white> within 60 seconds to continue, or <white>/up clear cancel</white>. Back up your database first.");
+            } catch (Exception e) {
+                e.printStackTrace();
+                Msg.err(sender, "Clear failed, see console.");
+            }
+        });
+    }
+
+    /** Step 2 of /up clear: deletes the rows and compacts the database. */
+    public void clearConfirm(CommandSender sender) {
+        ClearRequest r = clearRequests.remove(keyOf(sender));
+        if (r == null || r.expires() < System.currentTimeMillis()) {
+            Msg.err(sender, "Nothing to confirm. Start with /up clear <category> [t:<time>].");
+            return;
+        }
+        submit(() -> {
+            if (migrating) { Msg.err(sender, "A database migration is running. Try again afterwards."); return; }
+            try {
+                flush();
+                String where = LogStorage.whereFor(r.category(), r.until());
+                long rows = 0;
+                try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM logs WHERE " + where)) {
+                    if (rs.next()) rows = rs.getLong(1);
+                }
+                Msg.info(sender, "Clearing " + LogStorage.label(r.category()) + "... this may take a while.");
+                try (Statement st = connection.createStatement()) { st.execute(type.deleteSql(where)); }
+                Msg.info(sender, "Optimizing " + type.id() + " database...");
+                type.optimize(connection);
+                Msg.ok(sender, "Cleared <white>" + rows + "</white> rows of <white>" + LogStorage.label(r.category()) + "</white>. Database optimized.");
+            } catch (Exception e) {
+                e.printStackTrace();
+                Msg.err(sender, "Clear failed, see console.");
+            }
+        });
+    }
+
+    public void clearCancel(CommandSender sender) {
+        if (clearRequests.remove(keyOf(sender)) != null) Msg.ok(sender, "Clear cancelled.");
+        else Msg.err(sender, "Nothing to cancel.");
+    }
+
     public void autoPurge(int days) {
         submit(() -> {
             if (migrating) return;
@@ -515,6 +578,17 @@ public final class DatabaseManager {
                 out.add(Pager.kv("Rows", String.valueOf(total)));
                 out.add(Pager.kv("Size", size < 0 ? "n/a (remote)" : String.format(Locale.ROOT, "%.2f MB", size / 1048576.0)));
                 out.add(Pager.kv("Queue", String.valueOf(queue.size())));
+                List<LogStorage.Usage> usage;
+                try (Statement ust = connection.createStatement(); ResultSet urs = ust.executeQuery(LogStorage.USAGE_SQL)) {
+                    usage = LogStorage.read(urs);
+                }
+                usage = LogStorage.scale(usage, size);
+                out.add("<gray>Storage by log type" + (size < 0 ? " (estimated)" : " (approx.)") + ":</gray>");
+                for (LogStorage.Usage u : usage) {
+                    out.add("   <green>" + LogStorage.label(u.category()) + "</green> <dark_gray>»</dark_gray> <white>"
+                            + LogStorage.format(u.bytes()) + "</white> <gray>(" + u.rows() + " rows)</gray>");
+                }
+                out.add("<gray>By type:</gray>");
                 for (String[] l : lines) out.add("   <green>" + Msg.esc(l[0]) + "</green> <dark_gray>»</dark_gray> <white>" + l[1] + "</white>");
                 Pager.send(pageOut(sender), "Statistics", List.of(), out, 1, null);
             } catch (Exception e) {

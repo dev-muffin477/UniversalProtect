@@ -532,13 +532,14 @@ public final class ActionLogger implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onCreative(InventoryCreativeEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p) || !on("log.items", p.getLocation())) return;
+        if (!(e.getWhoClicked() instanceof Player p) || !on("log.creative", p.getLocation())) return;
         ItemStack cursor = e.getCursor();
         if (cursor.getType().isAir()) return;
-        ItemStack one = cursor.clone();
-        one.setAmount(1);
-        if (p.getInventory().containsAtLeast(one, 1)) return;
-        logItem("item", Actor.of(p), Actions.CREATE, cursor, cursor.getAmount(), p.getLocation(), null);
+        int have = 0;
+        for (ItemStack s : p.getInventory().getContents()) if (s != null && s.isSimilar(cursor)) have += s.getAmount();
+        int gained = cursor.getAmount() - have;
+        if (gained <= 0) return;
+        logItem("item", Actor.of(p), Actions.CREATE, cursor, gained, p.getLocation(), "creative");
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
