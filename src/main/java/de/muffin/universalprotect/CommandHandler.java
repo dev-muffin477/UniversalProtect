@@ -369,6 +369,7 @@ public final class CommandHandler implements CommandExecutor, TabCompleter {
             StringBuilder rest = new StringBuilder();
             for (int i = 1; i < args.length; i++) rest.append(args[i]).append(' ');
             plugin.audit().record(sender.getName(), sender instanceof Player pp ? pp.getUniqueId().toString() : null, world, x, y, z, sub, rest.toString());
+            plugin.discord().audit(sender.getName(), sub, rest.toString(), world, x, y, z);
         } catch (RuntimeException ignored) {  }
     }
 

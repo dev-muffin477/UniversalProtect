@@ -30,6 +30,7 @@ public final class UniversalProtect extends JavaPlugin {
     private Compactor compactor;
     private RollbackJournal journal;
     private StaffAudit audit;
+    private DiscordNotifier discord;
     private Investigator investigator;
     private final AnomalyDetector anomaly = new AnomalyDetector();
     private ActionLogger actionLogger;
@@ -51,6 +52,8 @@ public final class UniversalProtect extends JavaPlugin {
         }
         saveConfig();
         settings.load(this);
+        discord = new DiscordNotifier(getLogger());
+        discord.reload(discordConf());
 
         blacklist = new Blacklist(getDataFolder());
         blacklist.load();
@@ -64,6 +67,7 @@ public final class UniversalProtect extends JavaPlugin {
             db = new DatabaseManager(this, type);
         } catch (Throwable t) {
             getLogger().severe("Could not open the " + type.id() + " database: " + t);
+            discord.startupError("Database unavailable", "Could not open the " + type.id() + " database: " + t);
             t.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
             return;
@@ -122,6 +126,7 @@ public final class UniversalProtect extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (discord != null) discord.shutdown();
         if (api != null) getServer().getServicesManager().unregister(api);
         if (network != null) network.unregister();
         getServer().getScheduler().cancelTasks(this);
@@ -129,6 +134,7 @@ public final class UniversalProtect extends JavaPlugin {
     }
 
     private void onAnomaly(AnomalyDetector.Alert a) {
+        discord.alert(a.player(), a.rule(), a.level(), a.label(), a.summary(), a.world(), a.x(), a.y(), a.z());
         getLogger().warning("[Anomaly] " + a.player() + " " + a.summary() + " @ " + a.world() + " " + a.x() + " " + a.y() + " " + a.z());
         String w = a.world() == null ? "" : a.world().replace("'", "");
         String text = Msg.PREFIX + "<" + a.color() + ">\u26a0 " + a.label() + "</" + a.color() + "> <green>" + Msg.esc(a.player()) + "</green> <gray>" + Msg.esc(a.summary())
@@ -157,6 +163,7 @@ public final class UniversalProtect extends JavaPlugin {
         reloadConfig();
         Settings.registerDefaults(getConfig());
         settings.load(this);
+        discord.reload(discordConf());
         blacklist.load();
     }
 
@@ -169,6 +176,20 @@ public final class UniversalProtect extends JavaPlugin {
     public Compactor compactor() { return compactor; }
     public RollbackJournal journal() { return journal; }
     public StaffAudit audit() { return audit; }
+    public DiscordNotifier discord() { return discord; }
+
+    private DiscordNotifier.Conf discordConf() {
+        org.bukkit.configuration.file.FileConfiguration c = getConfig();
+        String alerts = c.getString("discord.alerts-webhook", "");
+        if (alerts == null || alerts.isBlank()) alerts = c.getString("detection.discord-webhook", "");
+        String audit = c.getString("discord.audit-webhook", "");
+        java.util.Set<String> ev = new java.util.HashSet<>();
+        for (String s : c.getStringList("discord.audit-events")) ev.add(s.toLowerCase(java.util.Locale.ROOT));
+        return new DiscordNotifier.Conf(c.getBoolean("discord.enabled", true),
+                alerts == null ? "" : alerts.trim(), audit == null ? "" : audit.trim(),
+                Math.max(1, Math.min(3, c.getInt("discord.min-level", 2))), ev,
+                c.getBoolean("discord.startup-errors", true), c.getString("discord.server-name", ""));
+    }
     public Investigator investigator() { return investigator; }
     public AnomalyDetector anomaly() { return anomaly; }
     public ActionLogger actionLogger() { return actionLogger; }
