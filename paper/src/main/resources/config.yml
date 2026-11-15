@@ -66,6 +66,9 @@ rollback:
   # If no pickup was logged for an item of the container, the player who broke it loses that item
   # (inventory, armor, offhand) when he is online. Needs no pickup log, so it also works for older breaks.
   reconcile-breaker: true
+  # Rolling back a broken block also takes the block item back from the player who picked it up
+  # (inventory, armor, offhand) and removes it from the ground, so the block does not exist twice.
+  reconcile-blocks: true
   reconcile-radius: 10            # blocks around the container to search for dropped items and pickups
   reconcile-window-minutes: 1440  # how long after the break (default 1 day) pickups are taken back
 

@@ -2,6 +2,12 @@
 
 All notable changes. Older versions and more detail are on the [wiki](https://github.com/dev-muffin477/UniversalProtect/wiki/Changelog). Entries apply to both editions unless marked **Paper** or **Fabric**.
 
+## 2.1.3
+
+### Fixed
+
+- **Item duplication when rolling back any broken block:** a player who broke a block (for example a netherite block) and picked it up kept the item, and the rollback put the block back, so it existed twice. A rollback of broken blocks now also removes the block item from the ground and from the inventory, armor and offhand of the player who picked it up (`rollback.reconcile-blocks`, default `true`). Players who are offline lose the item when they next join. Only pickups logged since 2.1.2 are taken back, and only up to the number of blocks that were rolled back.
+
 ## 2.1.2
 
 ### Fixed

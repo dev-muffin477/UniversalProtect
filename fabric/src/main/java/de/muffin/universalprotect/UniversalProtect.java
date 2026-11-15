@@ -217,7 +217,7 @@ public final class UniversalProtect implements ModInitializer {
 
     public String version() {
         return FabricLoader.getInstance().getModContainer("universalprotect")
-                .map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("2.1.2");
+                .map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("2.1.3");
     }
 
     public static UniversalProtect get() { return instance; }

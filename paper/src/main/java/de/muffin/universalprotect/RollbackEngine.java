@@ -2,6 +2,7 @@ package de.muffin.universalprotect;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
@@ -28,7 +29,7 @@ public final class RollbackEngine {
 
     private record Pos(int x, int y, int z) {}
 
-    private sealed interface Op permits BlockOp, ContainerOp, EntityOp, InvOp, ReconOp {}
+    private sealed interface Op permits BlockOp, ContainerOp, EntityOp, InvOp, ReconOp, DropOp {}
 
     private record BlockOp(String world, int x, int y, int z, String data, String extra, String facing) implements Op {
         boolean frame() { return FrameState.isFrame(data) || facing != null; }
@@ -49,6 +50,9 @@ public final class RollbackEngine {
     private record ReconOp(String world, int x, int y, int z, String data, String extra, List<Pickup> pickups,
                            String breakerUuid, String breaker, long time) implements Op {}
 
+    /** Block items of broken blocks that must leave the world again: dropped items and pickups of the breaker. */
+    private record DropOp(String world, String uuid, String player, String data, int count, List<int[]> cells, List<Pickup> pickups) implements Op {}
+
     private static final class Plan {
         final boolean restore;
         final Query query;
@@ -56,7 +60,7 @@ public final class RollbackEngine {
         final List<ContainerOp> containers = new ArrayList<>();
         final List<EntityOp> entities = new ArrayList<>();
         final List<InvOp> inventories = new ArrayList<>();
-        final List<ReconOp> recon = new ArrayList<>();
+        final List<Op> recon = new ArrayList<>();
         final List<Long> rowIds = new ArrayList<>();
         int rows, blockRows, containerRows, entityRows, inventoryRows;
 
@@ -190,6 +194,7 @@ public final class RollbackEngine {
                 "(action IN ('" + Actions.PLACED + "','" + Actions.BROKE + "') OR rolled_back = ?)", List.of(restore ? 1 : 0));
 
         List<Object[]> reconCandidates = new ArrayList<>();
+        Map<String, DropGroup> dropGroups = new LinkedHashMap<>();
         for (LogRow r : rows) {
             boolean used = false;
             String a = r.action();
@@ -211,6 +216,17 @@ public final class RollbackEngine {
                     if (!restore && Actions.BROKE.equals(a) && extra != null && extra.startsWith("inv:") && reconCandidates.size() < RECON_MAX
                             && plugin.settings().reconcileContainers()) {
                         reconCandidates.add(new Object[]{r, target, extra});
+                    }
+                    if (!restore && Actions.BROKE.equals(a) && r.uuid() != null && r.data() != null
+                            && plugin.settings().reconcileBlocks()
+                            && System.currentTimeMillis() - r.time() <= plugin.settings().reconcileWindowMs()) {
+                        int br = r.data().indexOf('[');
+                        String bid = br < 0 ? r.data() : r.data().substring(0, br);
+                        DropGroup g = dropGroups.computeIfAbsent(r.world() + "|" + r.uuid() + "|" + bid,
+                                k -> new DropGroup(r.world(), r.uuid(), r.player(), bid, r.time()));
+                        g.count++;
+                        g.max = Math.max(g.max, r.time());
+                        if (g.cells.size() < 400) g.cells.add(new int[]{r.x(), r.y(), r.z()});
                     }
                     used = true;
                 }
@@ -248,7 +264,51 @@ public final class RollbackEngine {
         for (Object[] c : reconCandidates) {
             plan.recon.add(reconFor((LogRow) c[0], (String) c[1], (String) c[2], reconUsed, planned, putCache));
         }
+        buildDrops(plan, dropGroups, planned);
         return plan;
+    }
+
+    private static final class DropGroup {
+        final String world, uuid, player, base;
+        final List<int[]> cells = new ArrayList<>();
+        int count;
+        long min, max;
+
+        DropGroup(String world, String uuid, String player, String base, long time) {
+            this.world = world; this.uuid = uuid; this.player = player; this.base = base; this.min = time; this.max = time;
+        }
+    }
+
+    /** Block items that players picked up after breaking blocks, so a rollback does not leave them in the inventory. */
+    private void buildDrops(Plan plan, Map<String, DropGroup> groups, Set<Long> planned) throws SQLException {
+        if (groups.isEmpty()) return;
+        final long window = 5L * 60_000L;
+        Map<String, long[]> span = new HashMap<>();
+        for (DropGroup g : groups.values()) {
+            long[] s = span.computeIfAbsent(g.uuid, k -> new long[]{g.min, g.max});
+            s[0] = Math.min(s[0], g.min);
+            s[1] = Math.max(s[1], g.max);
+        }
+        Map<String, List<LogRow>> picks = new HashMap<>();
+        for (Map.Entry<String, long[]> e : span.entrySet()) {
+            Query pq = new Query();
+            pq.type = "inventory";
+            pq.actions = Set.of(Actions.INV_ADD);
+            pq.since = e.getValue()[0];
+            pq.until = e.getValue()[1] + window;
+            picks.put(e.getKey(), db.selectRows(pq, true, 20000, 0, "meta = ? AND uuid = ? AND rolled_back = 0",
+                    List.<Object>of("pickup", e.getKey())));
+        }
+        int made = 0;
+        for (DropGroup g : groups.values()) {
+            if (made++ >= RECON_MAX) break;
+            List<Pickup> list = new ArrayList<>();
+            for (LogRow p : picks.getOrDefault(g.uuid, List.of())) {
+                if (p.oldExtra() == null || p.time() < g.min || p.time() > g.max + window) continue;
+                list.add(new Pickup(p.id(), p.uuid(), p.player(), p.oldExtra(), Math.max(1, p.amount()), List.of(), planned.contains(p.id())));
+            }
+            plan.recon.add(new DropOp(g.world, g.uuid, g.player, g.base, g.count, g.cells, list));
+        }
     }
 
     private PendingReclaim reclaimStore;
@@ -350,6 +410,7 @@ public final class RollbackEngine {
             case EntityOp e -> stepEntity(e, st, dry, inverse);
             case InvOp i -> stepInventory(i, st, dry, inverse);
             case ReconOp r -> stepRecon(r, st, dry, inverse);
+            case DropOp d -> stepDrop(d, st, dry, inverse);
         }
     }
 
@@ -561,6 +622,61 @@ public final class RollbackEngine {
                         inverse.inventories.add(new InvOp(op.breakerUuid(), op.breaker(), ItemSerializer.encodeProto(want.get(i)), removed, true));
                     }
                 }
+            }
+        }
+    }
+
+    private static ItemStack blockItem(String id) {
+        try {
+            Material m = Bukkit.createBlockData(id).getMaterial();
+            if (m.isAir() || !m.isItem()) return null;
+            return new ItemStack(m);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private void stepDrop(DropOp op, Stats st, boolean dry, Plan inverse) {
+        if (dry) return;
+        World w = DatabaseManager.world(op.world());
+        if (w == null) return;
+        ItemStack proto = blockItem(op.data());
+        if (proto == null) return;
+        int left = op.count();
+        for (int[] c : op.cells()) {
+            if (left <= 0) break;
+            Location center = new Location(w, c[0] + 0.5, c[1] + 0.5, c[2] + 0.5);
+            for (Entity e : w.getNearbyEntities(center, 2, 2, 2)) {
+                if (left <= 0) break;
+                if (!(e instanceof Item item)) continue;
+                ItemStack stack = item.getItemStack();
+                if (!same(proto, stack)) continue;
+                int take = Math.min(left, stack.getAmount());
+                left -= take;
+                st.reconGround += take;
+                if (take >= stack.getAmount()) item.remove();
+                else { ItemStack rest = stack.clone(); rest.setAmount(stack.getAmount() - take); item.setItemStack(rest); }
+            }
+        }
+        for (Pickup p : op.pickups()) {
+            if (left <= 0) break;
+            ItemStack pp = ItemSerializer.decode(p.item());
+            if (pp == null || !same(pp, proto)) continue;
+            int n = Math.min(left, p.amount());
+            left -= n;
+            if (p.handled()) continue;
+            Player pl;
+            try { pl = Bukkit.getPlayer(UUID.fromString(p.uuid())); } catch (IllegalArgumentException ex) { pl = null; }
+            if (pl != null) {
+                int removed = takeFrom(pl, proto, n);
+                if (removed > 0) {
+                    st.reconInv += removed;
+                    inverse.inventories.add(new InvOp(p.uuid(), p.player(), p.item(), removed, true));
+                }
+                if (n - removed > 0) st.reconMissed += n - removed;
+            } else {
+                reclaim().add(p.uuid(), p.player(), p.item(), n);
+                st.reconQueued += n;
             }
         }
     }

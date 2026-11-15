@@ -25,6 +25,7 @@ public final class Settings {
     private volatile long rollbackBudgetMs = 20L;
     private volatile boolean reconcileContainers = true;
     private volatile boolean reconcileBreaker = true;
+    private volatile boolean reconcileBlocks = true;
     private volatile int reconcileRadius = 10;
     private volatile long reconcileWindowMs = 24L * 60L * 60_000L;
     private volatile int defaultLines = 15;
@@ -52,6 +53,7 @@ public final class Settings {
         c.addDefault("rollback.time-budget-ms", 20);
         c.addDefault("rollback.reconcile-containers", true);
         c.addDefault("rollback.reconcile-breaker", true);
+        c.addDefault("rollback.reconcile-blocks", true);
         c.addDefault("rollback.reconcile-radius", 10);
         c.addDefault("rollback.reconcile-window-minutes", 1440);
         c.addDefault("networking.enabled", true);
@@ -111,6 +113,7 @@ public final class Settings {
         rollbackBudgetMs = Math.max(1, c.getLong("rollback.time-budget-ms", 20));
         reconcileContainers = c.getBoolean("rollback.reconcile-containers", true);
         reconcileBreaker = c.getBoolean("rollback.reconcile-breaker", true);
+        reconcileBlocks = c.getBoolean("rollback.reconcile-blocks", true);
         reconcileRadius = Math.max(1, Math.min(64, c.getInt("rollback.reconcile-radius", 10)));
         reconcileWindowMs = Math.max(1, c.getLong("rollback.reconcile-window-minutes", 1440)) * 60_000L;
         networking = c.getBoolean("networking.enabled", true);
@@ -139,6 +142,7 @@ public final class Settings {
     public long rollbackBudgetMs() { return rollbackBudgetMs; }
     public boolean reconcileContainers() { return reconcileContainers; }
     public boolean reconcileBreaker() { return reconcileBreaker; }
+    public boolean reconcileBlocks() { return reconcileBlocks; }
     public int reconcileRadius() { return reconcileRadius; }
     public long reconcileWindowMs() { return reconcileWindowMs; }
     public int defaultLines() { return defaultLines; }
