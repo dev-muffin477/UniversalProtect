@@ -472,6 +472,7 @@ public final class Hooks {
 
     private void onJoin(ServerPlayer p) {
         db().playerSeen(p.getUUID(), Mc.name(p));
+        plugin.rollback().applyPending(p);
         if (Perm.has(p.createCommandSourceStack(), "universalprotect.admin") && !plugin.getAlertMuted().contains(p.getUUID())) plugin.getAlertPlayers().add(p.getUUID());
         if (on("log.sessions", p.level())) logAt("session", Actor.of(p), Actions.JOIN, "Login", p.level(), p.blockPosition());
     }

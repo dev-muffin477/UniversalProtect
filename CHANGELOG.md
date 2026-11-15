@@ -6,7 +6,14 @@ All notable changes. Older versions and more detail are on the [wiki](https://gi
 
 ### Fixed
 
-- **Item duplication when rolling back a broken container:** a rollback of a broken chest (or any container) brought back its contents, while the items that had dropped on the ground or had been picked up by a player stayed in the world. Now the rollback removes the dropped items near the container and takes picked-up items back from players that are online (`rollback.reconcile-containers`, `rollback.reconcile-radius`, `rollback.reconcile-window-minutes`). The report shows how many items were handled. `/up undo` gives the items back to the players. Items that a player has already moved into another container cannot be traced, and offline players are skipped (counted as "could not be found").
+- **Item duplication when rolling back a broken container:** a rollback of a broken chest (or any container) brought back its contents, while the items that had dropped on the ground, been picked up or moved elsewhere stayed in the world. Now the rollback cleans that up, for up to one day after the break (`rollback.reconcile-containers`, `rollback.reconcile-radius`, `rollback.reconcile-window-minutes`):
+  - dropped items near the container are removed,
+  - items that players picked up are taken from their inventory, armor and offhand slots,
+  - items that those players put into other containers are taken from there,
+  - players who are offline lose the items when they next join (`pending-reclaim.txt`, kept for 14 days).
+- Rolling back a container together with the items that were put into it now empties the container first. Before, the container was removed first and its contents fell to the ground.
+- The rollback report has a new line **Duplicates prevented**. `/up undo` gives items back to online players and containers, but cannot cancel the entries waiting for offline players.
+- **Fabric:** containers are recognised by their block type, no longer by the saved block data.
 
 ## 2.1.0
 

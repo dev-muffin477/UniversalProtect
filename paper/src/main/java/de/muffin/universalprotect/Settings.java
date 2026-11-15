@@ -25,7 +25,7 @@ public final class Settings {
     private volatile long rollbackBudgetMs = 20L;
     private volatile boolean reconcileContainers = true;
     private volatile int reconcileRadius = 10;
-    private volatile long reconcileWindowMs = 30L * 60_000L;
+    private volatile long reconcileWindowMs = 24L * 60L * 60_000L;
     private volatile int defaultLines = 15;
     private volatile int maxLines = 100;
     private volatile boolean networking = true;
@@ -51,7 +51,7 @@ public final class Settings {
         c.addDefault("rollback.time-budget-ms", 20);
         c.addDefault("rollback.reconcile-containers", true);
         c.addDefault("rollback.reconcile-radius", 10);
-        c.addDefault("rollback.reconcile-window-minutes", 30);
+        c.addDefault("rollback.reconcile-window-minutes", 1440);
         c.addDefault("networking.enabled", true);
         c.addDefault("database.type", "duckdb");
         c.addDefault("database.sqlite.file", "database.db");
@@ -109,7 +109,7 @@ public final class Settings {
         rollbackBudgetMs = Math.max(1, c.getLong("rollback.time-budget-ms", 20));
         reconcileContainers = c.getBoolean("rollback.reconcile-containers", true);
         reconcileRadius = Math.max(1, Math.min(64, c.getInt("rollback.reconcile-radius", 10)));
-        reconcileWindowMs = Math.max(1, c.getLong("rollback.reconcile-window-minutes", 30)) * 60_000L;
+        reconcileWindowMs = Math.max(1, c.getLong("rollback.reconcile-window-minutes", 1440)) * 60_000L;
         networking = c.getBoolean("networking.enabled", true);
 
         plugin.anomaly().configure(new AnomalyDetector.ConfigReader() {

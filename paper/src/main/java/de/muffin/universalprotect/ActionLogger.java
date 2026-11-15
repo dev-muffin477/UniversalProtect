@@ -594,6 +594,7 @@ public final class ActionLogger implements Listener {
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
         db().playerSeen(p.getUniqueId(), p.getName());
+        plugin.rollback().applyPending(p);
         if (p.hasPermission("universalprotect.admin") && !plugin.getAlertMuted().contains(p.getUniqueId())) plugin.getAlertPlayers().add(p.getUniqueId());
         if (on("log.sessions", p.getLocation())) logAt("session", Actor.of(p), Actions.JOIN, "Login", p.getLocation());
     }

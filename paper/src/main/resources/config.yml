@@ -60,11 +60,11 @@ preview:
 
 rollback:
   time-budget-ms: 20
-  # When a broken container is rolled back, items that were dropped or picked up after the break are
-  # removed again, so rolling back does not duplicate them.
+  # When a broken container is rolled back, items that were dropped, picked up or moved to other containers
+  # after the break are taken back, so rolling back does not duplicate them.
   reconcile-containers: true
-  reconcile-radius: 10          # blocks around the container to search for dropped items and pickups
-  reconcile-window-minutes: 30  # how long after the break pickups are taken back
+  reconcile-radius: 10            # blocks around the container to search for dropped items and pickups
+  reconcile-window-minutes: 1440  # how long after the break (default 1 day) pickups are taken back
 
 networking:
   enabled: true
