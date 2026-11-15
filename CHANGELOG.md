@@ -2,6 +2,12 @@
 
 All notable changes. Older versions and more detail are on the [wiki](https://github.com/dev-muffin477/UniversalProtect/wiki/Changelog). Entries apply to both editions unless marked **Paper** or **Fabric**.
 
+## 2.1.1
+
+### Fixed
+
+- **Item duplication when rolling back a broken container:** a rollback of a broken chest (or any container) brought back its contents, while the items that had dropped on the ground or had been picked up by a player stayed in the world. Now the rollback removes the dropped items near the container and takes picked-up items back from players that are online (`rollback.reconcile-containers`, `rollback.reconcile-radius`, `rollback.reconcile-window-minutes`). The report shows how many items were handled. `/up undo` gives the items back to the players. Items that a player has already moved into another container cannot be traced, and offline players are skipped (counted as "could not be found").
+
 ## 2.1.0
 
 Paper and Fabric are now developed in one repository.

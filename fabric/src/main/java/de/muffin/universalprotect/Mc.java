@@ -148,6 +148,23 @@ public final class Mc {
         }
     }
 
+    public static List<ItemStack> contentsOf(Level level, BlockPos pos, String stateStr, String snbt) {
+        List<ItemStack> out = new java.util.ArrayList<>();
+        try {
+            BlockState state = parseState(stateStr);
+            CompoundTag tag = TagParser.parseCompoundFully(snbt);
+            BlockEntity be = BlockEntity.loadStatic(pos, state, tag, level.registryAccess());
+            if (be instanceof Container c) {
+                for (int i = 0; i < c.getContainerSize(); i++) {
+                    ItemStack s = c.getItem(i);
+                    if (!s.isEmpty()) out.add(s.copy());
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
     public static Container containerAt(Level level, BlockPos pos) {
         try {
             BlockState st = level.getBlockState(pos);

@@ -23,6 +23,9 @@ public final class Settings {
     private volatile int previewMaxBlocks = 20_000;
     private volatile long previewTimeoutMs = 120_000L;
     private volatile long rollbackBudgetMs = 20L;
+    private volatile boolean reconcileContainers = true;
+    private volatile int reconcileRadius = 10;
+    private volatile long reconcileWindowMs = 30L * 60_000L;
     private volatile int defaultLines = 15;
     private volatile int maxLines = 100;
     private volatile boolean networking = true;
@@ -46,6 +49,9 @@ public final class Settings {
         c.addDefault("preview.max-blocks", 20000);
         c.addDefault("preview.timeout-seconds", 120);
         c.addDefault("rollback.time-budget-ms", 20);
+        c.addDefault("rollback.reconcile-containers", true);
+        c.addDefault("rollback.reconcile-radius", 10);
+        c.addDefault("rollback.reconcile-window-minutes", 30);
         c.addDefault("networking.enabled", true);
         c.addDefault("database.type", "duckdb");
         c.addDefault("database.sqlite.file", "database.db");
@@ -101,6 +107,9 @@ public final class Settings {
         previewMaxBlocks = Math.max(0, c.getInt("preview.max-blocks", 20000));
         previewTimeoutMs = Math.max(10, c.getInt("preview.timeout-seconds", 120)) * 1000L;
         rollbackBudgetMs = Math.max(1, c.getLong("rollback.time-budget-ms", 20));
+        reconcileContainers = c.getBoolean("rollback.reconcile-containers", true);
+        reconcileRadius = Math.max(1, Math.min(64, c.getInt("rollback.reconcile-radius", 10)));
+        reconcileWindowMs = Math.max(1, c.getLong("rollback.reconcile-window-minutes", 30)) * 60_000L;
         networking = c.getBoolean("networking.enabled", true);
 
         plugin.anomaly().configure(new AnomalyDetector.ConfigReader() {
@@ -125,6 +134,9 @@ public final class Settings {
     public int previewMaxBlocks() { return previewMaxBlocks; }
     public long previewTimeoutMs() { return previewTimeoutMs; }
     public long rollbackBudgetMs() { return rollbackBudgetMs; }
+    public boolean reconcileContainers() { return reconcileContainers; }
+    public int reconcileRadius() { return reconcileRadius; }
+    public long reconcileWindowMs() { return reconcileWindowMs; }
     public int defaultLines() { return defaultLines; }
     public int maxLines() { return maxLines; }
     public boolean networking() { return networking; }

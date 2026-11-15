@@ -7,6 +7,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -16,11 +18,12 @@ import java.util.*;
 public final class RollbackEngine {
     private static final String AIR = "minecraft:air";
     private static final int PREVIEW_TOP = 8;
+    private static final int RECON_MAX = 300;
     private static final int PREVIEW_TOP_VERBOSE = 30;
 
     private record Pos(int x, int y, int z) {}
 
-    private sealed interface Op permits BlockOp, ContainerOp, EntityOp, InvOp {}
+    private sealed interface Op permits BlockOp, ContainerOp, EntityOp, InvOp, ReconOp {}
 
     private record BlockOp(String world, int x, int y, int z, String data, String extra, String facing) implements Op {
         boolean frame() { return FrameState.isFrame(data) || facing != null; }
@@ -32,6 +35,11 @@ public final class RollbackEngine {
 
     private record InvOp(String uuid, String player, String item, int amount, boolean add) implements Op {}
 
+    private record Pickup(long id, String uuid, String player, String item, int amount) {}
+
+    /** Keeps a restored container from duplicating items that were dropped or picked up after it was broken. */
+    private record ReconOp(String world, int x, int y, int z, String data, String extra, List<Pickup> pickups) implements Op {}
+
     private static final class Plan {
         final boolean restore;
         final Query query;
@@ -39,13 +47,14 @@ public final class RollbackEngine {
         final List<ContainerOp> containers = new ArrayList<>();
         final List<EntityOp> entities = new ArrayList<>();
         final List<InvOp> inventories = new ArrayList<>();
+        final List<ReconOp> recon = new ArrayList<>();
         final List<Long> rowIds = new ArrayList<>();
         int rows, blockRows, containerRows, entityRows, inventoryRows;
 
         Plan(boolean restore, Query query) { this.restore = restore; this.query = query; }
 
         int size() {
-            int n = containers.size() + entities.size() + inventories.size();
+            int n = containers.size() + entities.size() + inventories.size() + recon.size();
             for (Map<Pos, BlockOp> m : blocks.values()) n += m.size();
             return n;
         }
@@ -56,6 +65,7 @@ public final class RollbackEngine {
             all.addAll(containers);
             all.addAll(entities);
             all.addAll(inventories);
+            all.addAll(recon);
             return all;
         }
     }
@@ -72,6 +82,7 @@ public final class RollbackEngine {
         int entitySkipped;
         final Map<String, int[]> invPlayers = new TreeMap<>();
         int invDone, invOffline;
+        int reconGround, reconInv, reconMissed;
         final List<Object[]> previewBlocks = new ArrayList<>();
         long millis;
 
@@ -152,6 +163,8 @@ public final class RollbackEngine {
         List<LogRow> rows = db.selectRows(rq, restore, 0, 0,
                 "(action IN ('" + Actions.PLACED + "','" + Actions.BROKE + "') OR rolled_back = ?)", List.of(restore ? 1 : 0));
 
+        int reconCount = 0;
+        Set<Long> reconUsed = new HashSet<>();
         for (LogRow r : rows) {
             boolean used = false;
             String a = r.action();
@@ -170,6 +183,11 @@ public final class RollbackEngine {
                     BlockOp op = new BlockOp(r.world(), r.x(), r.y(), r.z(), target, extra, facing);
                     plan.blocks.computeIfAbsent(r.world(), k -> new LinkedHashMap<>()).put(new Pos(r.x(), r.y(), r.z()), op);
                     plan.blockRows++;
+                    if (!restore && Actions.BROKE.equals(a) && extra != null && extra.toLowerCase(Locale.ROOT).contains("items") && reconCount < RECON_MAX
+                            && plugin.settings().reconcileContainers()) {
+                        plan.recon.add(reconFor(r, target, extra, reconUsed));
+                        reconCount++;
+                    }
                     used = true;
                 }
                 case Actions.PUT, Actions.TAKE -> {
@@ -203,12 +221,30 @@ public final class RollbackEngine {
         return plan;
     }
 
+    private ReconOp reconFor(LogRow r, String data, String extra, Set<Long> used) throws SQLException {
+        Query pq = new Query();
+        pq.type = "inventory";
+        pq.actions = Set.of(Actions.INV_ADD);
+        pq.worlds = List.of(r.world());
+        pq.x = r.x(); pq.y = r.y(); pq.z = r.z();
+        pq.radius = plugin.settings().reconcileRadius();
+        pq.since = r.time();
+        pq.until = r.time() + plugin.settings().reconcileWindowMs();
+        List<Pickup> list = new ArrayList<>();
+        for (LogRow p : db.selectRows(pq, true, 0, 0, "rolled_back = 0", null)) {
+            if (!"pickup".equals(p.meta()) || p.oldExtra() == null || p.uuid() == null || !used.add(p.id())) continue;
+            list.add(new Pickup(p.id(), p.uuid(), p.player(), p.oldExtra(), Math.max(1, p.amount())));
+        }
+        return new ReconOp(r.world(), r.x(), r.y(), r.z(), data, extra, list);
+    }
+
     private void step(Op op, Stats st, boolean dry, Plan inverse) {
         switch (op) {
             case BlockOp b -> stepBlock(b, st, dry, inverse);
             case ContainerOp c -> stepContainer(c, st, dry, inverse);
             case EntityOp e -> stepEntity(e, st, dry, inverse);
             case InvOp i -> stepInventory(i, st, dry, inverse);
+            case ReconOp r -> stepRecon(r, st, dry, inverse);
         }
     }
 
@@ -331,6 +367,53 @@ public final class RollbackEngine {
         }
         st.invDone++;
         inverse.inventories.add(new InvOp(op.uuid(), op.player(), op.item(), op.amount(), !op.add()));
+    }
+
+    private void stepRecon(ReconOp op, Stats st, boolean dry, Plan inverse) {
+        if (dry) return;
+        ServerLevel w = Mc.level(op.world());
+        if (w == null) return;
+        List<ItemStack> want = new ArrayList<>();
+        List<Integer> counts = new ArrayList<>();
+        for (ItemStack s : Mc.contentsOf(w, new BlockPos(op.x(), op.y(), op.z()), op.data(), op.extra())) {
+            int i = 0;
+            while (i < want.size() && !ItemStack.isSameItemSameComponents(want.get(i), s)) i++;
+            if (i == want.size()) { want.add(s.copyWithCount(1)); counts.add(s.getCount()); }
+            else counts.set(i, counts.get(i) + s.getCount());
+        }
+        if (want.isEmpty()) return;
+        int radius = plugin.settings().reconcileRadius();
+        AABB box = new AABB(op.x() - radius, op.y() - radius, op.z() - radius, op.x() + radius + 1.0, op.y() + radius + 1.0, op.z() + radius + 1.0);
+        for (ItemEntity e : w.getEntitiesOfClass(ItemEntity.class, box)) {
+            ItemStack stack = e.getItem();
+            for (int i = 0; i < want.size(); i++) {
+                if (counts.get(i) <= 0 || !ItemStack.isSameItemSameComponents(want.get(i), stack)) continue;
+                int take = Math.min(counts.get(i), stack.getCount());
+                counts.set(i, counts.get(i) - take);
+                st.reconGround += take;
+                if (take >= stack.getCount()) e.discard();
+                else e.setItem(stack.copyWithCount(stack.getCount() - take));
+                break;
+            }
+        }
+        for (Pickup p : op.pickups()) {
+            ItemStack proto = ItemSerializer.decode(p.item());
+            if (proto == null) continue;
+            int i = 0;
+            while (i < want.size() && !ItemStack.isSameItemSameComponents(want.get(i), proto)) i++;
+            if (i == want.size() || counts.get(i) <= 0) continue;
+            int n = Math.min(counts.get(i), p.amount());
+            counts.set(i, counts.get(i) - n);
+            ServerPlayer pl;
+            try { pl = Mc.player(UUID.fromString(p.uuid())); } catch (IllegalArgumentException ex) { pl = null; }
+            if (pl == null) { st.reconMissed += n; continue; }
+            int removed = Mc.extract(pl.getInventory(), proto.copyWithCount(n), 36);
+            st.reconMissed += n - removed;
+            if (removed > 0) {
+                st.reconInv += removed;
+                inverse.inventories.add(new InvOp(p.uuid(), p.player(), p.item(), removed, true));
+            }
+        }
     }
 
     private interface Done { void finish(Stats st, Plan inverse); }
@@ -548,6 +631,10 @@ public final class RollbackEngine {
             int respawn = 0, removed = 0;
             for (int[] c : st.entityTypes.values()) { respawn += c[0]; removed += c[1]; }
             L.add(Pager.kv("Entities", respawn + " restored, " + removed + " removed <gray>(" + st.entitySkipped + " skipped)</gray>"));
+        }
+        if (st.reconGround + st.reconInv + st.reconMissed > 0) {
+            L.add(Pager.kv("Duplicates prevented", st.reconGround + " dropped items removed, " + st.reconInv
+                    + " taken back from players <gray>(" + st.reconMissed + " could not be found)</gray>"));
         }
         if (st.invDone + st.invOffline > 0) {
             L.add(Pager.kv("Inventories", st.invDone + " changes <gray>(" + st.invOffline + " skipped, player offline)</gray>"));

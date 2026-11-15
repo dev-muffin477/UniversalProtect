@@ -47,6 +47,20 @@ public final class BlockExtras {
         return null;
     }
 
+    public static List<ItemStack> items(String extra) {
+        List<ItemStack> out = new java.util.ArrayList<>();
+        try {
+            if (extra == null || !extra.startsWith("inv:")) return out;
+            String decoded = decompress(extra.substring(4));
+            String serializedStr = new String(Base64.getDecoder().decode(decoded), StandardCharsets.UTF_8);
+            YamlConfiguration config = new YamlConfiguration();
+            config.loadFromString(serializedStr);
+            List<?> list = config.getList("items");
+            if (list != null) for (Object o : list) if (o instanceof ItemStack is && !is.getType().isAir()) out.add(is);
+        } catch (Exception ignored) {}
+        return out;
+    }
+
     public static void apply(Block block, String extra) {
         if (extra == null || extra.isEmpty()) return;
         try {
