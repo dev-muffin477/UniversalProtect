@@ -422,9 +422,11 @@ public final class Hooks {
     public void pickup(ServerPlayer p, ItemStack stack, int amount) {
         if (suppressed() || amount <= 0) return;
         Level l = p.level();
-        if (!on("log.pickup", l)) return;
-        logItem("item", Actor.of(p), Actions.PICKUP, stack, amount, l, p.blockPosition(), null);
-        if (on("log.inventory", l)) logItem("inventory", Actor.of(p), Actions.INV_ADD, stack, amount, l, p.blockPosition(), "pickup");
+        boolean pickupLog = on("log.pickup", l);
+        boolean invLog = on("log.inventory", l);
+        if (!pickupLog && !(invLog && plugin.settings().reconcileContainers())) return;
+        if (pickupLog) logItem("item", Actor.of(p), Actions.PICKUP, stack, amount, l, p.blockPosition(), null);
+        if (invLog) logItem("inventory", Actor.of(p), Actions.INV_ADD, stack, amount, l, p.blockPosition(), "pickup");
     }
 
     public void craft(ServerPlayer p, ItemStack result) {

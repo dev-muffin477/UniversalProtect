@@ -472,10 +472,13 @@ public final class ActionLogger implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPickup(EntityPickupItemEvent e) {
-        if (!(e.getEntity() instanceof Player p) || !on("log.pickup", p.getLocation())) return;
+        if (!(e.getEntity() instanceof Player p)) return;
+        boolean pickupLog = on("log.pickup", p.getLocation());
+        boolean invLog = on("log.inventory", p.getLocation());
+        if (!pickupLog && !(invLog && plugin.settings().reconcileContainers())) return;
         ItemStack st = e.getItem().getItemStack();
-        logItem("item", Actor.of(p), Actions.PICKUP, st, st.getAmount(), p.getLocation(), null);
-        if (on("log.inventory", p.getLocation())) logItem("inventory", Actor.of(p), Actions.INV_ADD, st, st.getAmount(), p.getLocation(), "pickup");
+        if (pickupLog) logItem("item", Actor.of(p), Actions.PICKUP, st, st.getAmount(), p.getLocation(), null);
+        if (invLog) logItem("inventory", Actor.of(p), Actions.INV_ADD, st, st.getAmount(), p.getLocation(), "pickup");
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

@@ -2,6 +2,13 @@
 
 All notable changes. Older versions and more detail are on the [wiki](https://github.com/dev-muffin477/UniversalProtect/wiki/Changelog). Entries apply to both editions unless marked **Paper** or **Fabric**.
 
+## 2.1.2
+
+### Fixed
+
+- **Anti-duplication did not work with the default config:** picked-up items were only logged when `log.pickup` was on, which is off by default, so a rollback of a broken container found nothing to take back. Pickups are now logged (as inventory entries) whenever `log.inventory` and `rollback.reconcile-containers` are on, no matter what `log.pickup` says. Only containers broken after this update benefit from the pickup log.
+- New `rollback.reconcile-breaker` (default `true`): items of the container that no logged pickup explains are taken from the player who broke it (inventory, armor, offhand), if he is online. This also works for breaks that were logged before this update.
+
 ## 2.1.1
 
 ### Fixed

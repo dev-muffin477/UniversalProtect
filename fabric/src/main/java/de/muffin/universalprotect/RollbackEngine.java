@@ -38,10 +38,11 @@ public final class RollbackEngine {
     /** A PUT into another container by a player who had picked up items of a broken container. */
     private record PutRef(long id, String world, int x, int y, int z, String item, int[] left) {}
 
-    private record Pickup(long id, String uuid, String player, String item, int amount, List<PutRef> puts) {}
+    private record Pickup(long id, String uuid, String player, String item, int amount, List<PutRef> puts, boolean handled) {}
 
     /** Keeps a restored container from duplicating items that were dropped, picked up or moved after it was broken. */
-    private record ReconOp(String world, int x, int y, int z, String data, String extra, List<Pickup> pickups) implements Op {}
+    private record ReconOp(String world, int x, int y, int z, String data, String extra, List<Pickup> pickups,
+                           String breakerUuid, String breaker, long time) implements Op {}
 
     private static final class Plan {
         final boolean restore;
@@ -316,9 +317,9 @@ public final class RollbackEngine {
                 }
                 putsBy.put(p.uuid(), puts);
             }
-            list.add(new Pickup(p.id(), p.uuid(), p.player(), p.oldExtra(), Math.max(1, p.amount()), puts));
+            list.add(new Pickup(p.id(), p.uuid(), p.player(), p.oldExtra(), Math.max(1, p.amount()), puts, planned.contains(p.id())));
         }
-        return new ReconOp(r.world(), r.x(), r.y(), r.z(), data, extra, list);
+        return new ReconOp(r.world(), r.x(), r.y(), r.z(), data, extra, list, r.uuid(), r.player(), r.time());
     }
 
     private void step(Op op, Stats st, boolean dry, Plan inverse) {
@@ -499,14 +500,18 @@ public final class RollbackEngine {
                 break;
             }
         }
+        Set<Integer> picked = new HashSet<>();
         for (Pickup p : op.pickups()) {
             ItemStack proto = ItemSerializer.decode(p.item());
             if (proto == null) continue;
             int i = 0;
             while (i < want.size() && !same(want.get(i), proto)) i++;
-            if (i == want.size() || counts.get(i) <= 0) continue;
+            if (i == want.size()) continue;
+            picked.add(i);
+            if (counts.get(i) <= 0) continue;
             int n = Math.min(counts.get(i), p.amount());
             counts.set(i, counts.get(i) - n);
+            if (p.handled()) continue;
             ServerPlayer pl;
             try { pl = Mc.player(UUID.fromString(p.uuid())); } catch (IllegalArgumentException ex) { pl = null; }
             int need = n;
@@ -522,6 +527,23 @@ public final class RollbackEngine {
             } else {
                 need -= moveBack(p.puts(), proto, need, st, inverse);
                 if (need > 0) { reclaim().add(p.uuid(), p.player(), p.item(), need); st.reconQueued += need; }
+            }
+        }
+        if (plugin.settings().reconcileBreaker() && op.breakerUuid() != null
+                && System.currentTimeMillis() - op.time() <= plugin.settings().reconcileWindowMs()) {
+            ServerPlayer bp;
+            try { bp = Mc.player(UUID.fromString(op.breakerUuid())); } catch (IllegalArgumentException ex) { bp = null; }
+            if (bp != null) {
+                for (int i = 0; i < want.size(); i++) {
+                    int n = counts.get(i);
+                    if (n <= 0 || picked.contains(i)) continue;
+                    int removed = takeFrom(bp, want.get(i), n);
+                    counts.set(i, n - removed);
+                    if (removed > 0) {
+                        st.reconInv += removed;
+                        inverse.inventories.add(new InvOp(op.breakerUuid(), op.breaker(), ItemSerializer.encodeProto(want.get(i)), removed, true));
+                    }
+                }
             }
         }
     }
